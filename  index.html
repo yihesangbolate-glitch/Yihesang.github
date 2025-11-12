@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>摇杆控制小游戏（带得分）</title>
+<style>
+  body { margin: 0; overflow: hidden; background-color: #f0f8ff; }
+  canvas { display: block; margin: 0 auto; background-color: #a0d8f0; touch-action: none; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = { x: 300, y: 200, size: 30, color: "blue" };
+let obstacles = [];
+let gameOver = false;
+let score = 0;
+let obstacleInterval = 1500; // 初始生成间隔（毫秒）
+let speedMultiplier = 1;
+
+// 摇杆参数
+let joystick = { x: 80, y: 320, radius: 40, dx: 0, dy: 0, active: false };
+
+// 随机生成红色方块
+function createObstacle() {
+    let size = 20 + Math.random() * 30;
+    obstacles.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        size: size,
+        color: "red",
+        speed: (1 + Math.random() * 3) * speedMultiplier
+    });
+}
+
+// 碰撞检测
+function checkCollision(a, b) {
+    return a.x < b.x + b.size &&
+           a.x + a.size > b.x &&
+           a.y < b.y + b.size &&
+           a.y + a.size > b.y;
+}
+
+// 游戏主循环
+function gameLoop() {
+    if(gameOver) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制玩家
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.size, player.size);
+
+    // 绘制障碍物
+    obstacles.forEach((obs, index) => {
+        obs.y += obs.speed;
+        ctx.fillStyle = obs.color;
+        ctx.fillRect(obs.x, obs.y, obs.size, obs.size);
+
+        if(checkCollision(player, obs)) {
+            gameOver = true;
+            alert("游戏结束！你的得分是：" + score);
+        }
+
+        if(obs.y > canvas.height) obstacles.splice(index, 1);
+    });
+
+    // 玩家移动
+    player.x += joystick.dx;
+    player.y += joystick.dy;
+
+    // 边界检测
+    if(player.x < 0) player.x = 0;
+    if(player.x + player.size > canvas.width) player.x = canvas.width - player.size;
+    if(player.y < 0) player.y = 0;
+    if(player.y + player.size > canvas.height) player.y = canvas.height - player.size;
+
+    // 绘制摇杆
+    drawJoystick();
+
+    // 绘制分数
+    ctx.fillStyle = "black";
+    ctx.font = "20px Arial";
+    ctx.fillText("得分：" + score, 10, 30);
+
+    requestAnimationFrame(gameLoop);
+}
+
+function drawJoystick() {
+    ctx.beginPath();
+    ctx.arc(joystick.x, joystick.y, joystick.radius, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(200,200,200,0.3)";
+    ctx.fill();
+    ctx.closePath();
+
+    ctx.beginPath();
+    ctx.arc(joystick.x + joystick.dx*10, joystick.y + joystick.dy*10, joystick.radius/2, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(100,100,100,0.6)";
+    ctx.fill();
+    ctx.closePath();
+}
+
+// 触屏控制
+canvas.addEventListener("touchstart", (e) => {
+    let touch = e.touches[0];
+    let rect = canvas.getBoundingClientRect();
+    let tx = touch.clientX - rect.left;
+    let ty = touch.clientY - rect.top;
+    if(Math.hypot(tx - joystick.x, ty - joystick.y) < joystick.radius * 2) {
+        joystick.active = true;
+    }
+});
+
+canvas.addEventListener("touchmove", (e) => {
+    if(!joystick.active) return;
+    let touch = e.touches[0];
+    let rect = canvas.getBoundingClientRect();
+    let tx = touch.clientX - rect.left;
+    let ty = touch.clientY - rect.top;
+    let dx = tx - joystick.x;
+    let dy = ty - joystick.y;
+    let dist = Math.hypot(dx, dy);
+    let maxDist = joystick.radius;
+    if(dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
+    joystick.dx = dx/10;
+    joystick.dy = dy/10;
+});
+
+canvas.addEventListener("touchend", () => {
+    joystick.active = false;
+    joystick.dx = 0;
+    joystick.dy = 0;
+});
+
+// 定时生成障碍物
+let obstacleTimer = setInterval(createObstacle, obstacleInterval);
+
+// 计分 + 提高难度
+let scoreTimer = setInterval(() => {
+    if(gameOver) return;
+    score++;
+    // 每 10 分加快难度
+    if(score % 10 === 0) {
+        speedMultiplier += 0.2;
+        clearInterval(obstacleTimer);
+        obstacleInterval = Math.max(400, obstacleInterval - 100);
+        obstacleTimer = setInterval(createObstacle, obstacleInterval);
+    }
+}, 1000);
+
+gameLoop();
+</script>
+</body>
+</html>
